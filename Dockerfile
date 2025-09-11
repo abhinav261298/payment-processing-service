@@ -35,6 +35,9 @@ RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/migrations ./migrations
 COPY --from=build /app/seeds ./seeds
+## Also copy into dist for knexfile located in dist to resolve relative paths
+COPY --from=build /app/migrations ./dist/migrations
+COPY --from=build /app/seeds ./dist/seeds
 
 # Entrypoint for running migrations then starting the app
 COPY docker/entrypoint.sh /entrypoint.sh

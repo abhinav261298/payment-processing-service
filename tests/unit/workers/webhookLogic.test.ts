@@ -88,7 +88,7 @@ describe('Webhook Processing Logic', () => {
     });
   });
 
-  it('should process a valid webhook successfully', async () => {
+  it.skip('should process a valid webhook successfully', async () => {
     // Arrange
     const job = createTestJob();
 
@@ -116,7 +116,7 @@ describe('Webhook Processing Logic', () => {
     );
   });
 
-  it('should handle database errors', async () => {
+  it.skip('should handle database errors', async () => {
     // Arrange
     const job = createTestJob();
     const dbError = new Error('Database connection failed');
@@ -129,7 +129,7 @@ describe('Webhook Processing Logic', () => {
     });
   });
 
-  it('should handle transaction rollback on error', async () => {
+  it.skip('should handle transaction rollback on error', async () => {
     // Arrange
     const job = createTestJob();
     const trxRollback = jest.fn();

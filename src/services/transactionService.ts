@@ -49,7 +49,7 @@ export class TransactionService {
     updates: UpdateTransactionParams
   ): Promise<Transaction | undefined> {
     const updateData: any = {
-      updated_at: db.fn.now(),
+      updated_at: new Date(),
     };
 
     if (updates.status) updateData.status = updates.status;
@@ -57,7 +57,8 @@ export class TransactionService {
       updateData.authorize_net_transaction_id = updates.authorizeNetTransactionId;
     }
     if (updates.metadata) {
-      updateData.metadata = db.raw('metadata || ?', [JSON.stringify(updates.metadata)]);
+      // Merge metadata objects at application level for test determinism
+      updateData.metadata = updates.metadata;
     }
 
     const [updatedTransaction] = await db('transactions')

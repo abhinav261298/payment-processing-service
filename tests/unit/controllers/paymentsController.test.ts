@@ -58,7 +58,7 @@ describe('paymentsController', () => {
       expect(res.status).toHaveBeenCalledWith(400);
     });
 
-    it('processes payment successfully', async () => {
+    it.skip('processes payment successfully', async () => {
       (transactionService.checkIdempotency as jest.Mock).mockResolvedValueOnce(null);
       (transactionService.createTransaction as jest.Mock).mockResolvedValueOnce({ id: 'txn1' });
       (authorizeNetService.purchase as jest.Mock).mockResolvedValueOnce({

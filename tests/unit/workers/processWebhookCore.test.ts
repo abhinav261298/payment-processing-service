@@ -96,9 +96,12 @@ describe('Webhook Core Logic', () => {
 
     // Set up default transaction mock
     mockDb.transaction.mockImplementation(async (callback) => {
-      const trx: any = (table: string) => (mockDb as any)[table];
-      trx.commit = jest.fn().mockResolvedValue(undefined);
-      trx.rollback = jest.fn().mockResolvedValue(undefined);
+      const trx: any = (table: string) => (trx as any)[table];
+      Object.assign(trx, {
+        webhook_events: (mockDb as any).webhook_events,
+        commit: jest.fn().mockResolvedValue(undefined),
+        rollback: jest.fn().mockResolvedValue(undefined),
+      });
       return callback(trx);
     });
   });
