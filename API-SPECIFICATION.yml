@@ -1,0 +1,428 @@
+openapi: 3.0.3
+info:
+  title: Payment Processing Service API
+  version: 1.0.0
+  description: |
+    REST API for payments, subscriptions, authentication, and webhook ingestion.
+servers:
+  - url: http://localhost:3000
+    description: Local development
+security:
+  - bearerAuth: []
+
+paths:
+  /api/auth/register:
+    post:
+      summary: Register a new user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name:
+                  type: string
+                  example: Jane Doe
+                email:
+                  type: string
+                  format: email
+                  example: jane@example.com
+                password:
+                  type: string
+                  format: password
+                  example: password123
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccess'
+        '400':
+          description: Validation error or user already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/login:
+    post:
+      summary: Login with email and password
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccess'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/me:
+    get:
+      summary: Get current user
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/UserPublic'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/payments/purchase:
+    post:
+      summary: Process a one-time purchase
+      tags: [Payments]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, currency, paymentMethod]
+              properties:
+                amount:
+                  type: integer
+                  description: Amount in minor units (e.g., cents)
+                  example: 4999
+                currency:
+                  type: string
+                  example: USD
+                paymentMethod:
+                  type: object
+                  properties:
+                    cardNumber: { type: string, example: '4111111111111111' }
+                    expMonth: { type: string, example: '12' }
+                    expYear: { type: string, example: '2028' }
+                    cvc: { type: string, example: '123' }
+                metadata:
+                  type: object
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/payments/authorize:
+    post:
+      summary: Authorize a payment
+      tags: [Payments]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorizeRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/payments/capture:
+    post:
+      summary: Capture a previously authorized payment
+      tags: [Payments]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [authorizationId]
+              properties:
+                authorizationId:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+
+  /api/payments/void:
+    post:
+      summary: Void a payment/authorization
+      tags: [Payments]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transactionId]
+              properties:
+                transactionId:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+
+  /api/payments/refund:
+    post:
+      summary: Refund a payment
+      tags: [Payments]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transactionId, amount]
+              properties:
+                transactionId:
+                  type: string
+                amount:
+                  type: integer
+                  example: 1000
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+
+  /api/payments/transactions/{id}:
+    get:
+      summary: Get transaction details
+      tags: [Payments]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/webhooks/authorizenet:
+    post:
+      summary: Authorize.Net webhook endpoint
+      description: Requires HMAC signature in `x-anet-signature` header (hex) computed over raw body with `AUTHNET_SIGNATURE_KEY`.
+      tags: [Webhooks]
+      parameters:
+        - in: header
+          name: x-anet-event-type
+          required: true
+          schema: { type: string }
+        - in: header
+          name: x-anet-signature
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookPayload'
+      responses:
+        '200':
+          description: Received
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+                    example: true
+        '401':
+          description: Invalid signature
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /healthz:
+    get:
+      summary: Liveness probe
+      tags: [System]
+      responses:
+        '200':
+          description: OK
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      tags: [System]
+      responses:
+        '200':
+          description: OK (text/plain)
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdempotencyKey:
+      in: header
+      name: X-Idempotency-Key
+      required: true
+      schema:
+        type: string
+      description: Idempotency key to safely retry a payment mutation.
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        error:
+          oneOf:
+            - type: string
+            - type: object
+              properties:
+                code: { type: string }
+                message: { type: string }
+
+    UserPublic:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        first_name: { type: string }
+        last_name: { type: string }
+        name: { type: string, description: 'Derived full name in responses' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    AuthSuccess:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/UserPublic'
+            token:
+              type: string
+
+    AuthorizeRequest:
+      type: object
+      properties:
+        amount: { type: integer, example: 4999 }
+        currency: { type: string, example: USD }
+        paymentMethod:
+          type: object
+          properties:
+            cardNumber: { type: string }
+            expMonth: { type: string }
+            expYear: { type: string }
+            cvc: { type: string }
+        metadata: { type: object }
+
+    PaymentResponse:
+      type: object
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [completed, pending, failed, refunded] }
+        amount: { type: number }
+        currency: { type: string }
+        gateway_transaction_id: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Transaction:
+      type: object
+      properties:
+        id: { type: string }
+        transaction_id: { type: string }
+        amount: { type: number }
+        currency: { type: string }
+        status: { type: string }
+        metadata: { type: object }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    WebhookPayload:
+      type: object
+      description: Authorize.Net style event payload (simplified)
+      properties:
+        id: { type: string }
+        type: { type: string }
+        payload:
+          type: object
+          additionalProperties: true

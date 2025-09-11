@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: payment_processing_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app" --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+
+    env:
+      DATABASE_URL: postgres://app:app@localhost:5432/payment_processing_test
+      JWT_SECRET: test-secret
+      JWT_EXPIRES_IN: 1d
+      AUTHORIZE_NET_API_LOGIN_ID: test
+      AUTHORIZE_NET_TRANSACTION_KEY: test
+      AUTHORIZE_NET_ENVIRONMENT: sandbox
+      AUTHNET_SIGNATURE_KEY: test-signature
+      REDIS_HOST: localhost
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run DB migrations
+        run: npm run migrate:latest
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/

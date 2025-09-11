@@ -1,0 +1,57 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: payment_processing
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  api:
+    build: .
+    depends_on:
+      - db
+      - redis
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://app:app@db:5432/payment_processing
+      JWT_SECRET: dev-secret
+      JWT_EXPIRES_IN: 1d
+      AUTHORIZE_NET_API_LOGIN_ID: "test"
+      AUTHORIZE_NET_TRANSACTION_KEY: "test"
+      AUTHORIZE_NET_ENVIRONMENT: "sandbox"
+      AUTHNET_SIGNATURE_KEY: "test-signature"
+      REDIS_HOST: redis
+    ports:
+      - "3000:3000"
+    command: ["node", "dist/server.js"]
+
+  worker:
+    build: .
+    depends_on:
+      - db
+      - redis
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://app:app@db:5432/payment_processing
+      JWT_SECRET: dev-secret
+      JWT_EXPIRES_IN: 1d
+      AUTHORIZE_NET_API_LOGIN_ID: "test"
+      AUTHORIZE_NET_TRANSACTION_KEY: "test"
+      AUTHORIZE_NET_ENVIRONMENT: "sandbox"
+      AUTHNET_SIGNATURE_KEY: "test-signature"
+      REDIS_HOST: redis
+      ENABLE_WEBHOOK_WORKER: "true"
+    command: ["node", "dist/workers/processWebhooks.js"]
+
+volumes:
+  pgdata: {}
